@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { Play, Pause, FastForward, RotateCcw, Zap, Info, Cpu, Braces, BrainCircuit, Users, Split } from 'lucide-react';
 
 interface EntropyData {
@@ -193,7 +193,7 @@ const simulateInteractionFast = (pAIdx: number, pBIdx: number, pool: Uint8Array,
 };
 
 // Component to render the dynamic Epoch vs Entropy line chart
-const EntropyChart = ({ data }: { data: EntropyData[] }) => {
+const EntropyChart = memo(({ data }: { data: EntropyData[] }) => {
   const maxEpoch = data.length > 0 ? Math.max(...data.map(d => d.epoch)) : 0;
   // Automatically step the X axis scale: 10 -> 100 -> 1000 -> 10000 -> ...
   const xAxisMax = [10, 100, 1000, 10000, 100000, 1000000, 10000000].find(v => v >= Math.max(10, maxEpoch)) || Math.max(10, maxEpoch);
@@ -277,10 +277,10 @@ const EntropyChart = ({ data }: { data: EntropyData[] }) => {
        </p>
     </div>
   );
-};
+});
 
 // Component to render a compressed visual of a Program History Item
-const HistoryItemView = ({
+const HistoryItemView = memo(({
   idxA,
   idxB,
   dataA,
@@ -322,7 +322,7 @@ const HistoryItemView = ({
       </div>
     </div>
   );
-};
+});
 
 export default function App() {
   // PERSISTENT THE HUGE POOL (N=131072) - Only initialized once
@@ -407,7 +407,6 @@ export default function App() {
       entropy: calculateEntropy(arena.tape),
     };
 
-    setInteractionCount(c => c + 1);
     setPairHistory(prev => [newHistoryItem, ...prev].slice(0, 8)); // Keep last 8
 
     loadNextPair();
