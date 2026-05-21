@@ -195,8 +195,11 @@ const simulateInteractionFast = (pAIdx: number, pBIdx: number, pool: Uint8Array,
 // Component to render the dynamic Epoch vs Entropy line chart
 const EntropyChart = memo(({ data }: { data: EntropyData[] }) => {
   const maxEpoch = data.length > 0 ? Math.max(...data.map(d => d.epoch)) : 0;
-  // Automatically step the X axis scale: 10 -> 100 -> 1000 -> 10000 -> ...
-  const xAxisMax = [10, 100, 1000, 10000, 100000, 1000000, 10000000].find(v => v >= Math.max(10, maxEpoch)) || Math.max(10, maxEpoch);
+  // Step X axis scale: 10 -> 100 -> 1000 -> 10000, then grow linearly in 10k steps
+  const baseMax = Math.max(10, maxEpoch);
+  const xAxisMax = baseMax <= 10000 
+    ? ([10, 100, 1000, 10000].find(v => v >= baseMax) || 10)
+    : Math.ceil(baseMax / 10000) * 10000;
 
   const width = 500;
   const height = 180;
@@ -341,6 +344,7 @@ export default function App() {
   const [speed, setSpeed] = useState<number>(10); // steps per tick
   const [simProgress, setSimProgress] = useState<{ active: boolean; current: number; total: number }>({ active: false, current: 0, total: 0 });
   const [entropyHistory, setEntropyHistory] = useState<EntropyData[]>([]); // Tracks global pool entropy over epochs
+  const [customEpochs, setCustomEpochs] = useState<number>(1000);
 
   // Correctly loads the next visual pair from the persistent pool
   const loadNextPair = useCallback(() => {
@@ -732,13 +736,23 @@ export default function App() {
                             100 Epochs
                         </button>
                       </div>
-                      <button 
-                          onClick={() => simulateEpochsAsync(1000)}
-                          className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl font-semibold bg-fuchsia-500/10 text-fuchsia-400 hover:bg-fuchsia-500/20 border border-fuchsia-500/20 transition-all mt-1"
-                      >
-                          <Zap className="w-4 h-4" />
-                          Simulate 1,000 Epochs
-                      </button>
+                      <div className="flex gap-2 mt-1">
+                        <input 
+                            type="number" 
+                            value={customEpochs} 
+                            onChange={(e) => setCustomEpochs(Math.max(1, parseInt(e.target.value) || 1))}
+                            className="w-24 px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-100 text-sm font-mono focus:outline-none focus:border-fuchsia-500 text-center"
+                            min="1"
+                            title="Number of epochs to simulate"
+                        />
+                        <button 
+                            onClick={() => simulateEpochsAsync(customEpochs)}
+                            className="flex-1 flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl font-semibold bg-fuchsia-500/10 text-fuchsia-400 hover:bg-fuchsia-500/20 border border-fuchsia-500/20 transition-all text-sm"
+                        >
+                            <Zap className="w-4 h-4" />
+                            Simulate {customEpochs.toLocaleString()} {customEpochs === 1 ? 'Epoch' : 'Epochs'}
+                        </button>
+                      </div>
                   </>
               )}
               
