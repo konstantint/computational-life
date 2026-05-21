@@ -40,6 +40,8 @@ To reach the required epochs (up to 10M+), the simulation requires a "Fast-Forwa
 
 *   **Zero-Allocation Loop:** The fast-forward engine must run a pure-JS inline execution loop that reads and writes directly to a shared `Uint8Array` pool reference. It should not allocate new memory arrays inside the `while` loop.
 *   **UI Yielding:** Massive requests (e.g., 10M epochs) must be chunked (e.g., processing chunks of 50 epochs) and wrapped in `setTimeout` or `requestAnimationFrame` to yield execution back to the browser. This updates the progress bar and prevents the UI thread from hanging.
+*   **Custom Simulation Input:** The UI provides a numeric input field to define a custom number of epochs to simulate (defaulting to 1,000), alongside preset buttons for 10 and 100 epochs, enabling flexible simulation lengths.
+*   **Render Performance (Memoization):** Due to high-frequency state updates during visual simulation steps, heavy child components—specifically `EntropyChart` and static `HistoryItemView` timeline cards—are wrapped in `React.memo` to prevent redundant renders and maintain 60fps performance.
 
 ## 4. UI/UX and Data Visualization Requirements
 
@@ -70,69 +72,59 @@ To reach the required epochs (up to 10M+), the simulation requires a "Fast-Forwa
     
     1.  *Global Pool Entropy:* Shannon entropy of the full 8.4MB pool. Logged every 50 epochs. Expect a rock-solid line near `~7.9999` that only crashes during an extinction/replicator event (typically between 2k-16k epochs).
     2.  *Arena Sample Entropy:* Fluctuating dotted line representing the immediate 128-byte pair.
-*   **Dynamic X-Axis:** The X-axis must scale dynamically based on the current maximum epoch (10, 100, 1,000, 10,000, etc.).
+*   **Dynamic X-Axis:** The X-axis scales dynamically. It steps exponentially for early stages (`10 -> 100 -> 1,000 -> 10,000`) to keep early development focused, and transitions to linear growth in steps of `10,000` (`20,000 -> 30,000 -> ...`) for later stages to prevent excessive chart compression during very long runs.
 
-## 5. Build Instructions (Manual HTML/Production Build)
+## 5. Development and Build Instructions (Makefile Automation)
 
-Since the project is a modern React application utilizing Tailwind CSS and external icons (`lucide-react`), it cannot be run as a raw `.html` file natively in the browser without a build step. To manually compile this single file into a production-ready HTML bundle, use Vite.
+The project setup is complete, incorporating a structured Vite + React + TypeScript + Tailwind CSS v4 workspace. A `Makefile` is provided in the root to automate all development, build, and deployment workflows.
 
-### Step 1: Project Initialization
+### 5.1 Setup & Installation
 
-Open a terminal and run the following commands to create a fast Vite+React scaffolding:
+To install all required dependencies (including React 19, Vite 6, Tailwind v4, and Lucide icons), run:
 
-```
-npm create vite@latest computational-life -- --template react
-cd computational-life
-npm install
+```bash
+make install
 ```
 
-### Step 2: Install Dependencies
+*Note: Make sure you have Node.js (v22+) active in your environment (e.g., via `nvm use 22` if using nvm).*
 
-Install Tailwind CSS and the required icon set:
+### 5.2 Local Development
 
-```
-npm install -D tailwindcss postcss autoprefixer
-npx tailwindcss init -p
-npm install lucide-react
-```
+To launch the local Vite development server with hot-reloading:
 
-### Step 3: Configure Tailwind
-
-Open the generated `tailwind.config.js` and ensure it scans your React files:
-
-```
-/** @type {import('tailwindcss').Config} */
-export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
-  theme: {
-    extend: {},
-  },
-  plugins: [],
-}
+```bash
+npm run dev
 ```
 
-Open `src/index.css` and replace its contents with the Tailwind directives:
+This will start the server (typically at `http://localhost:5173`) allowing you to run and debug the application interactively in the browser.
 
-```
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-```
+### 5.3 Compiling for Production
 
-### Step 4: Inject the Source Code
+To compile and bundle the application into a highly optimized, standalone static web page:
 
-Take the provided `App.jsx` (or `App.tsx`) file and completely replace the contents of `src/App.jsx` with it.
-
-### Step 5: Build to HTML
-
-To create the final, standalone, minified web application:
-
-```
-npm run build
+```bash
+make build
 ```
 
-Vite will output the compiled application into the `dist/` directory. This directory will contain an `index.html` file and an `assets/` folder containing the compiled JS and CSS. This folder can now be hosted statically anywhere (GitHub Pages, Netlify, S3, or standard Apache/Nginx webservers).
+Vite will type-check the code using TypeScript (`tsc`) and compile the minified bundle into the `dist/` directory, containing:
+*   `dist/index.html`: The single-page entry point.
+*   `dist/assets/`: Combined and minified JavaScript and CSS assets.
+
+### 5.4 Deployment (GitHub Pages)
+
+Once your git repository is set up and linked to your GitHub remote, you can deploy the built production folder directly to GitHub Pages by running:
+
+```bash
+make deploy
+```
+
+This automates the deployment using `gh-pages`, pushing the contents of the `dist/` folder to your hosting branch.
+
+### 5.5 Cleaning Build Artifacts
+
+To clean up local build assets and the `node_modules` directory:
+
+```bash
+make clean
+```
 
