@@ -148,6 +148,14 @@ const simulateInteractionFast = (pAIdx: number, pBIdx: number, pool: Uint8Array,
     tempTape.set(pool.subarray(pAIdx * PROG_SIZE, (pAIdx + 1) * PROG_SIZE), 0);
     tempTape.set(pool.subarray(pBIdx * PROG_SIZE, (pBIdx + 1) * PROG_SIZE), PROG_SIZE);
 
+    // Apply Background Mutation (0.024% per byte)
+    const MUTATION_RATE = 0.00024;
+    for (let i = 0; i < TAPE_SIZE; i++) {
+        if (Math.random() < MUTATION_RATE) {
+            tempTape[i] = Math.floor(Math.random() * 256);
+        }
+    }
+
     let ip = 0, h0 = 0, h1 = 0, cycles = 0;
 
     while (ip >= 0 && ip < TAPE_SIZE && cycles < MAX_CYCLES) {
@@ -360,6 +368,14 @@ export default function App() {
     newTape.set(pool.subarray(idxA * PROG_SIZE, (idxA + 1) * PROG_SIZE), 0);
     newTape.set(pool.subarray(idxB * PROG_SIZE, (idxB + 1) * PROG_SIZE), PROG_SIZE);
 
+    // Apply Background Mutation (0.024% per byte)
+    const MUTATION_RATE = 0.00024;
+    for (let i = 0; i < TAPE_SIZE; i++) {
+        if (Math.random() < MUTATION_RATE) {
+            newTape[i] = Math.floor(Math.random() * 256);
+        }
+    }
+
     setArena({
       idxA, idxB, tape: newTape, ip: 0, h0: 0, h1: 0, cycles: 0, status: 'running'
     });
@@ -447,6 +463,12 @@ export default function App() {
     const tempInteractionTape = new Uint8Array(TAPE_SIZE);
     const interactionsPerEpoch = Math.floor(POOL_SIZE / 2);
     
+    // Pre-allocate indices for systematic shuffling (without replacement)
+    const indices = new Int32Array(POOL_SIZE);
+    for (let i = 0; i < POOL_SIZE; i++) {
+        indices[i] = i;
+    }
+
     // Lock the starting epoch before we enter the asynchronous simulation loop
     const baseEpoch = Math.floor(interactionCount / (POOL_SIZE / 2));
     let epochsDone = 0;
@@ -456,16 +478,25 @@ export default function App() {
         await new Promise<void>(resolve => {
             setTimeout(() => {
                 const epochsToRun = Math.min(CHUNK_SIZE, numEpochs - epochsDone);
-                const numInteractions = epochsToRun * interactionsPerEpoch;
                 
-                for (let i = 0; i < numInteractions; i++) {
-                    const pAIdx = Math.floor(Math.random() * POOL_SIZE);
-                    let pBIdx = Math.floor(Math.random() * POOL_SIZE);
-                    while (pBIdx === pAIdx) pBIdx = Math.floor(Math.random() * POOL_SIZE);
+                for (let e = 0; e < epochsToRun; e++) {
+                    // Systematic shuffle (Fisher-Yates) to pair up programs without replacement
+                    for (let i = POOL_SIZE - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        const temp = indices[i];
+                        indices[i] = indices[j];
+                        indices[j] = temp;
+                    }
 
-                    simulateInteractionFast(pAIdx, pBIdx, pool, tempInteractionTape);
+                    // Pair up all programs sequentially
+                    for (let i = 0; i < interactionsPerEpoch; i++) {
+                        const pAIdx = indices[2 * i];
+                        const pBIdx = indices[2 * i + 1];
+                        simulateInteractionFast(pAIdx, pBIdx, pool, tempInteractionTape);
+                    }
                 }
                 
+                const numInteractions = epochsToRun * interactionsPerEpoch;
                 epochsDone += epochsToRun;
                 setInteractionCount(c => c + numInteractions);
                 setSimProgress(prev => ({ ...prev, current: epochsDone }));

@@ -13,7 +13,8 @@ To accurately reflect the paper, the simulation engine MUST adhere to these cons
 *   **TAPE_SIZE:** `128` bytes (Interaction arena is precisely Block A + Block B concatenated).
 *   **MAX_CYCLES:** `8,192` ($2^{13}$) operations allowed per interaction before termination.
 *   **INSTRUCTIONS:** `"<>{}-+.,[]"`. All other byte values are interpreted as NO-OPs.
-*   **True Epoch Definition:** 1 Epoch = `65,536` interactions (exactly `POOL_SIZE / 2` pairs, simulating one full pass over the entire pool).
+*   **MUTATION_RATE:** `0.024%` (0.00024 probability per byte) applied to the concatenated tape before every interaction.
+*   **True Epoch Definition:** 1 Epoch = `65,536` interactions (exactly `POOL_SIZE / 2` pairs). The simulation engine must pair up programs **systematically without replacement** (by shuffling the pool indices once per epoch) to ensure every program interacts exactly once.
 
 ## 3. System Architecture & Performance Engine
 
@@ -27,7 +28,7 @@ The pool must be initialized with true random noise.
 
 The interpreter must maintain local state for an interaction:
 
-*   `ip` (Instruction Pointer)
+*   `ip` (Instruction Pointer). The interpreter **halts immediately** if `ip` goes out of bounds (beyond `TAPE_SIZE` or below 0). The IP does **not** wrap around.
 *   `h0` (Head 0 / Data Pointer)
 *   `h1` (Head 1 / Target Pointer)
 *   Memory limits strictly wrap via modulo operations (`% TAPE_SIZE` or `% 256`).
@@ -39,6 +40,8 @@ The interpreter must maintain local state for an interaction:
 To reach the required epochs (up to 10M+), the simulation requires a "Fast-Forward" engine separate from the visual React state.
 
 *   **Zero-Allocation Loop:** The fast-forward engine must run a pure-JS inline execution loop that reads and writes directly to a shared `Uint8Array` pool reference. It should not allocate new memory arrays inside the `while` loop.
+*   **Systematic Shuffling:** The engine must shuffle the pool indices at the start of each epoch using a Fisher-Yates shuffle and pair them up sequentially to ensure a systematic, no-replacement epoch simulation.
+*   **Background Mutation:** Before executing each interaction, the engine must apply background mutations to the concatenated tape with a `0.024%` probability per byte.
 *   **UI Yielding:** Massive requests (e.g., 10M epochs) must be chunked (e.g., processing chunks of 50 epochs) and wrapped in `setTimeout` or `requestAnimationFrame` to yield execution back to the browser. This updates the progress bar and prevents the UI thread from hanging.
 *   **Custom Simulation Input:** The UI provides a numeric input field to define a custom number of epochs to simulate (defaulting to 1,000), alongside preset buttons for 10 and 100 epochs, enabling flexible simulation lengths.
 *   **Render Performance (Memoization):** Due to high-frequency state updates during visual simulation steps, heavy child components—specifically `EntropyChart` and static `HistoryItemView` timeline cards—are wrapped in `React.memo` to prevent redundant renders and maintain 60fps performance.
